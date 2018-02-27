@@ -476,6 +476,32 @@ void StateStatusErrorGetter(Local<String> property, const Nan::PropertyCallbackI
     Local<Value> error = IntToStorjError(state->error_status);
     info.GetReturnValue().Set(error);
 }
+//add on 2018.2.27
+#if defined(_WIN32)
+char *EncodingConvert(const char* strIn, int sourceCodepage, int targetCodepage)
+{
+	int len = lstrlen(strIn);
+	int unicodeLen = MultiByteToWideChar(sourceCodepage, 0, strIn, -1, NULL, 0);
+	wchar_t* pUnicode;
+
+	pUnicode = new wchar_t[unicodeLen + 1];
+	memset(pUnicode, 0, (unicodeLen + 1) * sizeof(wchar_t));
+
+	MultiByteToWideChar(sourceCodepage, 0, strIn, -1, (LPWSTR)pUnicode, unicodeLen);
+
+	BYTE * pTargetData = NULL;
+	int targetLen = WideCharToMultiByte(targetCodepage, 0, (LPWSTR)pUnicode, -1, (char *)pTargetData, 0, NULL, NULL);
+
+	pTargetData = new BYTE[targetLen + 1];
+	memset(pTargetData, 0, targetLen + 1);
+
+	WideCharToMultiByte(targetCodepage, 0, (LPWSTR)pUnicode, -1, (char *)pTargetData, targetLen, NULL, NULL);
+
+	delete pUnicode;
+
+	return (char *)pTargetData;
+}
+#endif
 
 void StoreFile(const Nan::FunctionCallbackInfo<Value> &args)
 {
@@ -516,7 +542,18 @@ void StoreFile(const Nan::FunctionCallbackInfo<Value> &args)
     const char *index = *index_str;
     const char *index_dup = strdup(index);
 
-    FILE *fd = fopen(file_path, "r");
+//convert to ANSI encoding, add on 2018.2.27
+#if defined(_WIN32)
+	file_path = EncodingConvert(file_path, CP_UTF8, CP_ACP);
+#endif
+
+	FILE *fd = fopen(file_path, "r");
+
+//add on 2018.2.27
+#if defined(_WIN32)
+	delete file_path;
+#endif
+
     if (!fd)
     {
         v8::Local<v8::String> msg = Nan::New("Unable to open file").ToLocalChecked();
@@ -682,6 +719,11 @@ void ResolveFile(const Nan::FunctionCallbackInfo<Value> &args)
     }
 
     FILE *fd = NULL;
+	
+//convert to ANSI encoding, add on 2018.2.27
+#if defined(_WIN32)
+	file_path = EncodingConvert(file_path, CP_UTF8, CP_ACP);
+#endif
 
     if (access(file_path, F_OK) != -1)
     {
@@ -701,6 +743,11 @@ void ResolveFile(const Nan::FunctionCallbackInfo<Value> &args)
     }
 
     fd = fopen(file_path, "w+");
+
+//add on 2018.2.27
+#if defined(_WIN32)
+	delete file_path;
+#endif
 
     if (fd == NULL)
     {
