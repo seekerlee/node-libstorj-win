@@ -2,6 +2,9 @@
 #include <node_buffer.h>
 #include <nan.h>
 #include <uv.h>
+#if defined(_WIN32)		//add by dy
+	#include <io.h>		//add by dy
+#endif		            //add by dy
 #include "storj.h"
 
 using namespace v8;
@@ -918,7 +921,8 @@ void Environment(const v8::FunctionCallbackInfo<Value> &args)
     Nan::MaybeLocal<v8::Object> maybeInstance;
     v8::Local<v8::Object> instance;
 
-    v8::Local<v8::Value> argv[] = {};
+//    v8::Local<v8::Value> argv[] = {};
+	v8::Local<v8::Value> *argv = 0;		//modified by dy
     maybeInstance = Nan::NewInstance(constructor->GetFunction(), 0, argv);
 
     if (maybeInstance.IsEmpty())
@@ -1020,7 +1024,8 @@ void Environment(const v8::FunctionCallbackInfo<Value> &args)
     proxy->persistent.Reset(persistent);
 
     // There is no guarantee that the free callback will be called
-    persistent.SetWeak(proxy, FreeEnvironmentCallback, WeakCallbackType::kParameter);
+    //persistent.SetWeak(proxy, FreeEnvironmentCallback, WeakCallbackType::kParameter);
+	persistent.SetWeak(proxy, FreeEnvironmentCallback, Nan::WeakCallbackType::kParameter);	//modified by dy
     persistent.MarkIndependent();
     Nan::AdjustExternalMemory(sizeof(storj_env_t));
 
