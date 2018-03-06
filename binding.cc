@@ -2,10 +2,13 @@
 #include <node_buffer.h>
 #include <nan.h>
 #include <uv.h>
-#if defined(_WIN32)		//add by dy
-	#include <io.h>		//add by dy
-#endif		            //add by dy
-#include "storj.h"
+
+//add on 2018.3.6
+#if defined(_WIN32)
+	#include <io.h>
+	#include <memory>
+#endif
+#include <storj.h>
 
 using namespace v8;
 using namespace Nan;
@@ -478,10 +481,10 @@ void StateStatusErrorGetter(Local<String> property, const Nan::PropertyCallbackI
 }
 //add on 2018.2.27
 #if defined(_WIN32)
-char *EncodingConvert(const char* strIn, int sourceCodepage, int targetCodepage)
+std::unique_ptr<char[]> EncodingConvert(const char* strIn, int sourceCodepage, int targetCodepage)
 {
-	int len = lstrlen(strIn);
-	int unicodeLen = MultiByteToWideChar(sourceCodepage, 0, strIn, -1, NULL, 0);
+	//int len = lstrlen(strIn);
+	int unicodeLen = MultiByteToWideChar(sourceCodepage, 0, strIn, -1, nullptr, 0);
 	wchar_t* pUnicode;
 
 	pUnicode = new wchar_t[unicodeLen + 1];
@@ -489,17 +492,16 @@ char *EncodingConvert(const char* strIn, int sourceCodepage, int targetCodepage)
 
 	MultiByteToWideChar(sourceCodepage, 0, strIn, -1, (LPWSTR)pUnicode, unicodeLen);
 
-	BYTE * pTargetData = NULL;
-	int targetLen = WideCharToMultiByte(targetCodepage, 0, (LPWSTR)pUnicode, -1, (char *)pTargetData, 0, NULL, NULL);
+	char * pTargetData = nullptr;
+	int targetLen = WideCharToMultiByte(targetCodepage, 0, (LPWSTR)pUnicode, -1, pTargetData, 0, nullptr, nullptr);
 
-	pTargetData = new BYTE[targetLen + 1];
+	pTargetData = new char[targetLen + 1];
 	memset(pTargetData, 0, targetLen + 1);
 
-	WideCharToMultiByte(targetCodepage, 0, (LPWSTR)pUnicode, -1, (char *)pTargetData, targetLen, NULL, NULL);
+	WideCharToMultiByte(targetCodepage, 0, (LPWSTR)pUnicode, -1, pTargetData, targetLen, nullptr, nullptr);
 
-	delete pUnicode;
-
-	return (char *)pTargetData;
+	delete[] pUnicode;
+	return std::unique_ptr<char[]>(pTargetData);
 }
 #endif
 
@@ -542,17 +544,13 @@ void StoreFile(const Nan::FunctionCallbackInfo<Value> &args)
     const char *index = *index_str;
     const char *index_dup = strdup(index);
 
-//convert to ANSI encoding, add on 2018.2.27
+//convert to ANSI encoding, add on 2018.3.6
 #if defined(_WIN32)
-	file_path = EncodingConvert(file_path, CP_UTF8, CP_ACP);
+	std::unique_ptr<char[]> u_p = EncodingConvert(file_path, CP_UTF8, CP_ACP);
+	file_path = u_p.get();
 #endif
 
 	FILE *fd = fopen(file_path, "r");
-
-//add on 2018.2.27
-#if defined(_WIN32)
-	delete file_path;
-#endif
 
     if (!fd)
     {
@@ -719,10 +717,11 @@ void ResolveFile(const Nan::FunctionCallbackInfo<Value> &args)
     }
 
     FILE *fd = NULL;
-	
-//convert to ANSI encoding, add on 2018.2.27
+
+//convert to ANSI encoding, add on 2018.3.6
 #if defined(_WIN32)
-	file_path = EncodingConvert(file_path, CP_UTF8, CP_ACP);
+	std::unique_ptr<char[]> u_p = EncodingConvert(file_path, CP_UTF8, CP_ACP);
+	file_path = u_p.get();
 #endif
 
     if (access(file_path, F_OK) != -1)
@@ -743,12 +742,6 @@ void ResolveFile(const Nan::FunctionCallbackInfo<Value> &args)
     }
 
     fd = fopen(file_path, "w+");
-
-//add on 2018.2.27
-#if defined(_WIN32)
-	delete file_path;
-#endif
-
     if (fd == NULL)
     {
         v8::Local<v8::String> msg = Nan::New(strerror(errno)).ToLocalChecked();
